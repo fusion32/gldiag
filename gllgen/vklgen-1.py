@@ -8,6 +8,14 @@ VK_BASE						= 0
 VK_INSTANCE					= 1
 VK_DEVICE					= 2
 
+# platform enums
+VK_XLIB						= 0
+VK_XCB						= 1
+VK_WAYLAND					= 2
+VK_MIR						= 3
+VK_ANDROID					= 4
+VK_WIN32					= 5
+
 # extension enums
 
 # instance extensions
@@ -24,14 +32,6 @@ VK_KHR_win32_surface		= 8
 # device extensions
 VK_KHR_swapchain			= 9
 VK_KHR_display_swapchain	= 10
-
-# platform enums
-VK_XLIB						= 0
-VK_XCB						= 1
-VK_WAYLAND					= 2
-VK_MIR						= 3
-VK_ANDROID					= 4
-VK_WIN32					= 5
 
 # Tables
 # ==================================
@@ -257,13 +257,13 @@ VK_EXT_PROC(VK_INSTANCE, VK_KHR_surface, "vkGetPhysicalDeviceSurfaceFormatsKHR")
 VK_EXT_PROC(VK_INSTANCE, VK_KHR_surface, "vkGetPhysicalDeviceSurfacePresentModesKHR")
 
 # VK_KHR_display
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetPhysicalDeviceDisplayPropertiesKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayPlaneSupportedDisplaysKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayModePropertiesKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkCreateDisplayModeKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayPlaneCapabilitiesKHR")
-#VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkCreateDisplayPlaneSurfaceKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetPhysicalDeviceDisplayPropertiesKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetPhysicalDeviceDisplayPlanePropertiesKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayPlaneSupportedDisplaysKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayModePropertiesKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkCreateDisplayModeKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkGetDisplayPlaneCapabilitiesKHR")
+VK_EXT_PROC(VK_INSTANCE, VK_KHR_display, "vkCreateDisplayPlaneSurfaceKHR")
 
 # WSI Extensions (Instance)
 # ==================================
@@ -332,6 +332,25 @@ with open("vulkan/vk_loader.h", "wb") as f:
 #include <vulkan/vulkan.h>
 #include <vulkan/vk_sdk_platform.h>
 
+typedef struct VkInfo{
+''')
+
+	f.write(b"\t// instance extensions\n")
+	for ext, proc_list in VK_EXT_INSTANCE_ITEMS:
+		f.write(("\tVkBool32 %s;\n" % VK_EXT_NAME[ext][3:]).encode("utf-8"))
+
+	for platform, proc_list in VK_WSI_ITEMS:
+		f.write(("\tVkBool32 %s;\n" % VK_EXT_NAME[VK_WSI_EXT[platform]][3:]).encode("utf-8"))
+
+	f.write(b"\n\t// device extensions\n")
+	for ext, proc_list in VK_EXT_DEVICE_ITEMS:
+		f.write(("\tVkBool32 %s;\n" % VK_EXT_NAME[ext][3:]).encode("utf-8"))
+
+	f.write(br'''
+} VkInfo;
+
+extern VkInfo vk_info;
+
 // Vulkan 1.0 Core
 // ==================================
 
@@ -398,8 +417,8 @@ with open("vulkan/vk_loader.h", "wb") as f:
 // API Loading
 // ==================================
 VkBool32	VK_LoadBaseAPI();
-VkBool32	VK_LoadInstanceAPI(VkInstance instance);
-VkBool32	VK_LoadDeviceAPI(VkDevice device);
+VkBool32	VK_LoadInstanceAPI(VkInstance instance, uint32_t enabledExtensionCount, const char **ppEnabledExtensions);
+VkBool32	VK_LoadDeviceAPI(VkDevice device, uint32_t enabledExtensionCount, const char **ppEnabledExtensions);
 
 void		VK_UnloadAPI();
 
@@ -467,6 +486,9 @@ with open("vulkan/vk_loader.c", "wb") as f:
 #ifndef LOG_DEBUG
 	#define LOG_DEBUG(fmt, ...)
 #endif
+
+
+VkInfo vk_info;
 
 // Vulkan Loader State
 // 0 = unloaded
@@ -614,15 +636,20 @@ VkBool32 VK_LoadBaseAPI()
 	#define VK_GET_PROC_ADDR(proc_name)												\
 		proc_name = (PFN_##proc_name) vkGetInstanceProcAddr(NULL, #proc_name);		\
 		if(proc_name == NULL){														\
-			LOG_ERROR("VK_LoadBaseAPI: Failed to load %s!", #proc_name);			\
+			LOG_ERROR("VK_LoadBaseAPI: Failed to load '%s'", #proc_name);			\
 			res = VK_FALSE;															\
 		}
 
 	res = VK_TRUE;
 ''')
 
+	# vkGetInstanceProcAddr needs to be loaded directly from the DLL
+	# and if we use it to load itself, NULL is returned (at least in
+	# driver implementation)
+
 	for name in VK_CORE[VK_BASE]:
-		f.write(("\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"));
+		if name != "vkGetInstanceProcAddr":
+			f.write(("\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"))
 
 	f.write(br'''
 	#undef VK_GET_PROC_ADDR
@@ -635,18 +662,14 @@ VkBool32 VK_LoadBaseAPI()
 		return VK_FALSE;
 	}
 
-	// retrieve instance extensions
-	//uint32_t extensionCount;
-	//VkExtensionProperties ext;
-	//vkEnumerateInstanceExtensionProperties(NULL, &extensionCount, &ext);
-
 	l_state = 1;
 	return VK_TRUE;
 }
 
-VkBool32 VK_LoadInstanceAPI(VkInstance instance)
+VkBool32 VK_LoadInstanceAPI(VkInstance instance, uint32_t enabledExtensionCount, const char **ppEnabledExtensions)
 {
-	VkBool32 res;
+	VkBool32 ret;
+	uint32_t i;
 
 	if(VK_IsLibOpen() == VK_FALSE || l_state == 0){
 		LOG_ERROR("VK_LoadInstanceAPI: Base API not loaded!");
@@ -662,34 +685,97 @@ VkBool32 VK_LoadInstanceAPI(VkInstance instance)
 	#define VK_GET_PROC_ADDR(proc_name)													\
 		proc_name = (PFN_##proc_name) vkGetInstanceProcAddr(instance, #proc_name);		\
 		if(proc_name == NULL){															\
-			LOG_ERROR("VK_LoadInstanceAPI: Failed to load %s!", #proc_name);			\
-			res = VK_FALSE;																\
+			LOG_ERROR("VK_LoadInstanceAPI: Failed to load '%s'", #proc_name);			\
+			ret = VK_FALSE;																\
 		}
 
-	res = VK_TRUE;
+	// load core
+	ret = VK_TRUE;
 ''')
 
 	for name in VK_CORE[VK_INSTANCE]:
-		f.write(("\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"));
-
-	# extensions
+		f.write(("\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"))
 
 	f.write(br'''
-	#undef VK_GET_PROC_ADDR
-	//=================================================================
 
-	if(res == VK_FALSE){
-		LOG_ERROR("VK_LoadInstanceAPI: Failed to load all procs.");
+	if(ret == VK_FALSE){
+		LOG_ERROR("VK_LoadInstanceAPI: Failed to load core instance procs.");
 		return VK_FALSE;
 	}
+
+	// load extensions
+	for(i = 0; i < enabledExtensionCount; i++){
+''')
+
+	if_str = "if"
+	first = True
+
+	for ext, proc_list in VK_EXT_INSTANCE_ITEMS:
+		f.write((r'''
+		%s(strcmp(ppEnabledExtensions[i], "%s") == 0){
+			ret = VK_TRUE;
+''' % (if_str,
+		VK_EXT_NAME[ext]
+		)).encode("utf-8"))
+
+		for name in proc_list:
+			f.write(("\t\t\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"))
+
+		f.write((r'''
+			vk_info.%s = ret;
+			if(ret == VK_FALSE)
+				LOG_WARNING("VK_LoadInstanceAPI: Failed to load extension '%%s'", "%s");
+		}
+''' % (VK_EXT_NAME[ext][3:],
+		VK_EXT_NAME[ext]
+		)).encode("utf-8"))
+
+		if first:
+			if_str = "else if"
+			first = False
+
+
+	for platform, proc_list in VK_WSI_ITEMS:
+		f.write((r'''
+#ifdef %s
+		%s(strcmp(ppEnabledExtensions[i], "%s") == 0){
+			ret = VK_TRUE;
+''' % (VK_WSI_DEFINE[platform],
+		if_str,
+		VK_EXT_NAME[VK_WSI_EXT[platform]]
+		)).encode("utf-8"))
+
+		for name in proc_list:
+			f.write(("\t\t\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"))
+
+		f.write((r'''
+			vk_info.%s = ret;
+			if(ret == VK_FALSE)
+				LOG_WARNING("VK_LoadInstanceAPI: Failed to load extension '%%s'", "%s");
+		}
+#endif
+''' % (VK_EXT_NAME[VK_WSI_EXT[platform]][3:],
+		VK_EXT_NAME[VK_WSI_EXT[platform]]
+		)).encode("utf-8"))
+
+		if first:
+			if_str = "else if"
+			first = False
+
+	f.write(br'''
+	}
+
+	#undef VK_GET_PROC_ADDR
+	//=================================================================
 
 	l_state = 2;
 	return VK_TRUE;
 }
 
-VkBool32 VK_LoadDeviceAPI(VkDevice device)
+VkBool32 VK_LoadDeviceAPI(VkDevice device, uint32_t enabledExtensionCount, const char **ppEnabledExtensions)
 {
-	VkBool32 res;
+	VkBool32 ret;
+	uint32_t i;
 
 	if(VK_IsLibOpen() == VK_FALSE || l_state < 2){
 		LOG_ERROR("VK_LoadDeviceAPI: Instance API not loaded!");
@@ -705,26 +791,60 @@ VkBool32 VK_LoadDeviceAPI(VkDevice device)
 	#define VK_GET_PROC_ADDR(proc_name)													\
 		proc_name = (PFN_##proc_name) vkGetDeviceProcAddr(device, #proc_name);			\
 		if(proc_name == NULL){															\
-			LOG_ERROR("VK_LoadDeviceAPI: Failed to load %s!", #proc_name);				\
-			res = VK_FALSE;																\
+			LOG_ERROR("VK_LoadDeviceAPI: Failed to load '%s'", #proc_name);				\
+			ret = VK_FALSE;																\
 		}
 
-	res = VK_TRUE;
+	// load core
+	ret = VK_TRUE;
 ''')
 
 	for name in VK_CORE[VK_DEVICE]:
 		f.write(("\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"));
 
-	# extensions
-
 	f.write(br'''
-	#undef VK_GET_PROC_ADDR
-	//=================================================================
 
-	if(res == VK_FALSE){
-		LOG_ERROR("VK_LoadDeviceAPI: Failed to load all procs.");
+	if(ret == VK_FALSE){
+		LOG_ERROR("VK_LoadDeviceAPI: Failed to load device core procs.");
 		return VK_FALSE;
 	}
+
+	// load extensions
+	for(i = 0; i < enabledExtensionCount; i++){
+''')
+
+
+	if_str = "if"
+	first = True
+	for ext, proc_list in VK_EXT_DEVICE_ITEMS:
+		f.write((r'''
+		%s(strcmp(ppEnabledExtensions[i], "%s") == 0){
+			ret = VK_TRUE;
+''' % (if_str,
+		VK_EXT_NAME[ext]
+		)).encode("utf-8"))
+
+		for name in proc_list:
+			f.write(("\t\t\tVK_GET_PROC_ADDR(%s);\n" % name).encode("utf-8"))
+
+		f.write((r'''
+			vk_info.%s = ret;
+			if(ret == VK_FALSE)
+				LOG_WARNING("VK_LoadDeviceAPI: Failed to load extension '%%s'", "%s");
+		}
+''' % (VK_EXT_NAME[ext][3:],
+		VK_EXT_NAME[ext]
+		)).encode("utf-8"))
+
+		if first:
+			if_str = "else if"
+			first = False
+
+	f.write(br'''
+	}
+
+	#undef VK_GET_PROC_ADDR
+	//=================================================================
 
 	l_state = 3;
 	return VK_TRUE;
