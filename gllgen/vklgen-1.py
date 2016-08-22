@@ -432,7 +432,23 @@ with open("vulkan/vk_loader.c", "wb") as f:
 
 ///////////////////////////////////////////////////////////////////////////////////////
 // Overview:
-//	TODO
+//	The Vulkan Loader will load the Vulkan API by doing 3 steps:
+//		1 - Loading the base API;
+//		2 - Loading the instance API;
+//		3 - Loading the device API.
+//
+//	1 - Loading the base API doesn't require any other preparation and it is required
+//	to create any instance of Vulkan.
+//
+//	2 - Loading the instance API requires a valid Vulkan instance to be created before.
+//	This can only be achieved by first loading the base API or by linking the vulkan
+//	library into the application which in this case shouldn't be using this loader.
+//
+//	3 - Loading the device API requires a valid Vulkan device to be created before. This
+//	can only be achieved by first setting up a valid Vulkan instance, querying physical
+//	device information and then creating the device itself. These preparations can only
+//	be done by first loading the base API and the instance API or by linking the vulkan
+//	library into the application which in this case shouldn't be using this loader.
 //
 ///////////////////////////////////////////////////////////////////////////////////////
 // Base API: the functions needed for querying any extension or layer properties
@@ -443,27 +459,34 @@ with open("vulkan/vk_loader.c", "wb") as f:
 // and the creation of the Vulkan Device. The device API can't load without this.
 //
 // Device API: the functions needed for the Vulkan Device management.
+//
 ///////////////////////////////////////////////////////////////////////////////////////
 // VK_LoadBaseAPI
-//	- Info: In case of failure, VK_FALSE will be returned and the library is to be
-//	considered invalid or inexistant. If it succeed, VK_TRUE will be returned and
-//	the base API will be loaded.
+//	- Info: Loads the base API.
+//	- Return Value: In case of failure it will return VK_FALSE, otherwise VK_TRUE will
+//	be returned.
 //
 // VK_LoadInstanceAPI
-//	- Info: In case of failure, VK_FALSE will be returned and the contents of the
-//	API function pointers will be undefined. If it succeed, VK_TRUE will be returned
-//	and the instance API will be loaded.
+//	- Info: Loads the instance API.
+//	- Params:
+//		@instance: valid Vulkan instance
+//		@enabledExtensionCount: same as used in instance creation
+//		@ppEnabledExtensions: same as used in instance creation
+//	- Return Value: In case of failure it will return VK_FALSE, otherwise VK_TRUE will
+//	be returned.
 //
 // VK_LoadDeviceAPI
-//	- Info: In case of failure, VK_FALSE will be returned and the contents of the
-//	API function pointers will be undefined. If it succeed, VK_TRUE will be returned
-//	and the device API will be loaded.
+//	- Info: Loads the Device API.
+//	- Params:
+//		@device: valid Vulkan device
+//		@enabledExtensionCount: same as used in device creation
+//		@ppEnabledExtensions: same as used in device creation
+//	- Return Value: In case of failure it will return VK_FALSE, otherwise VK_TRUE will
+//	be returned.
 //
 // VK_UnloadAPI
-//	- Info: If the library is open, it will be closed and vkGetInstanceProcAddr
-//	and vkGetDeviceProcAddr will be set to NULL. The contents of the other function
-//	pointers will be undefined and calling any of those will result in undefined
-//	behaviour.
+//	- Info: Unloads the Vulkan library and reset the loader status back to unloaded.
+//
 ///////////////////////////////////////////////////////////////////////////////////////
 
 #include "vk_loader.h"
