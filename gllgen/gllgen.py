@@ -1,113 +1,71 @@
+"""
+// TODO: review extensions to be used for the low end OpenGL renderer
+// and also which ones to use with the high end OpenGL renderer
+
+// [low] extensions
+// ARB_framebuffer_object / EXT_framebuffer_object
+// ARB_uniform_buffer_object
+// EXT_texture_array
+// ARB_sync
+// ARB_texture_storage
+// ARB_vertex_attrib_binding
+// ARB_explicit_attrib_location
+// ARB_explicit_uniform_location
+// ARB_shading_language_420pack
+// ARB_debug_output
+
+// [high] extensions
+// ARB_shader_draw_parameters
+// ARB_bindless_texture
+"""
+
+# os package
 import os
+# template engine
+from jinja2 import Environment, FileSystemLoader
 
-GL_VERSION_1_0 = 0
-GL_VERSION_1_1 = 1
-GL_VERSION_1_2 = 2
-GL_VERSION_1_3 = 3
-GL_VERSION_1_4 = 4
-GL_VERSION_1_5 = 5
+class GLVersion:
+	def __init__(self, major, minor):
+		self.v = (major, minor)
 
-GL_VERSION_2_0 = 6
-GL_VERSION_2_1 = 7
+	def major(self):
+		return self.v[0]
 
-GL_VERSION_3_0 = 8
-GL_VERSION_3_1 = 9
-GL_VERSION_3_2 = 10
-GL_VERSION_3_3 = 11
+	def minor(self):
+		return self.v[1]
 
-GL_VERSION_4_0 = 12
-GL_VERSION_4_1 = 13
-GL_VERSION_4_2 = 14
-GL_VERSION_4_3 = 15
-GL_VERSION_4_4 = 16
-GL_VERSION_4_5 = 17
+	def __repr__(self):
+		return "{}.{}".format(*self.v)
 
-GL_VERSION = {
-    GL_VERSION_1_0 : 1.0,
-    GL_VERSION_1_1 : 1.1,
-    GL_VERSION_1_2 : 1.2,
-    GL_VERSION_1_3 : 1.3,
-    GL_VERSION_1_4 : 1.4,
-    GL_VERSION_1_5 : 1.5,
+	def __lt__(self, rhs):
+		return (self.v[0] < rhs.v[0] and
+			self.v[1] < rhs.v[1])
 
-    GL_VERSION_2_0 : 2.0,
-    GL_VERSION_2_1 : 2.1,
+GL_VERSION_1_0 = GLVersion(1, 0)
+GL_VERSION_1_1 = GLVersion(1, 1)
+GL_VERSION_1_2 = GLVersion(1, 2)
+GL_VERSION_1_3 = GLVersion(1, 3)
+GL_VERSION_1_4 = GLVersion(1, 4)
+GL_VERSION_1_5 = GLVersion(1, 5)
+GL_VERSION_2_0 = GLVersion(2, 0)
+GL_VERSION_2_1 = GLVersion(2, 1)
+GL_VERSION_3_0 = GLVersion(3, 0)
+GL_VERSION_3_1 = GLVersion(3, 1)
+GL_VERSION_3_2 = GLVersion(3, 2)
+GL_VERSION_3_3 = GLVersion(3, 3)
+GL_VERSION_4_0 = GLVersion(4, 0)
+GL_VERSION_4_1 = GLVersion(4, 1)
+GL_VERSION_4_2 = GLVersion(4, 2)
+GL_VERSION_4_3 = GLVersion(4, 3)
+GL_VERSION_4_4 = GLVersion(4, 4)
+GL_VERSION_4_5 = GLVersion(4, 5)
 
-    GL_VERSION_3_0 : 3.0,
-    GL_VERSION_3_1 : 3.1,
-    GL_VERSION_3_2 : 3.2,
-    GL_VERSION_3_3 : 3.3,
-
-    GL_VERSION_4_0 : 4.0,
-    GL_VERSION_4_1 : 4.1,
-    GL_VERSION_4_2 : 4.2,
-    GL_VERSION_4_3 : 4.3,
-    GL_VERSION_4_4 : 4.4,
-    GL_VERSION_4_5 : 4.5,
-}
-
-GL_VERSION_MAJOR = {
-    GL_VERSION_1_0 : 1,
-    GL_VERSION_1_1 : 1,
-    GL_VERSION_1_2 : 1,
-    GL_VERSION_1_3 : 1,
-    GL_VERSION_1_4 : 1,
-    GL_VERSION_1_5 : 1,
-
-    GL_VERSION_2_0 : 2,
-    GL_VERSION_2_1 : 2,
-
-    GL_VERSION_3_0 : 3,
-    GL_VERSION_3_1 : 3,
-    GL_VERSION_3_2 : 3,
-    GL_VERSION_3_3 : 3,
-
-    GL_VERSION_4_0 : 4,
-    GL_VERSION_4_1 : 4,
-    GL_VERSION_4_2 : 4,
-    GL_VERSION_4_3 : 4,
-    GL_VERSION_4_4 : 4,
-    GL_VERSION_4_5 : 4,
-}
-
-GL_VERSION_MINOR = {
-    GL_VERSION_1_0 : 0,
-    GL_VERSION_1_1 : 1,
-    GL_VERSION_1_2 : 2,
-    GL_VERSION_1_3 : 3,
-    GL_VERSION_1_4 : 4,
-    GL_VERSION_1_5 : 5,
-
-    GL_VERSION_2_0 : 0,
-    GL_VERSION_2_1 : 1,
-
-    GL_VERSION_3_0 : 0,
-    GL_VERSION_3_1 : 1,
-    GL_VERSION_3_2 : 2,
-    GL_VERSION_3_3 : 3,
-
-    GL_VERSION_4_0 : 0,
-    GL_VERSION_4_1 : 1,
-    GL_VERSION_4_2 : 2,
-    GL_VERSION_4_3 : 3,
-    GL_VERSION_4_4 : 4,
-    GL_VERSION_4_5 : 5,
-}
 
 GL_CORE = {}
-GL_EXTENSIONS = {}
-
 def GL_CORE_PROC(version, func_type, func_name):
     if not version in GL_CORE:
         GL_CORE[version] = []
-
     GL_CORE[version].append((func_type, func_name))
-
-def GL_EXT_PROC(ext, func_type, func_name):
-	if not ext in GL_EXTENSIONS:
-		GL_EXTENSIONS[ext] = []
-
-	GL_EXTENSIONS[ext].append((func_type, func_name))
 
 """
 # OpenGL 1.0
@@ -802,312 +760,24 @@ GL_CORE_PROC(GL_VERSION_4_5, "PFNGLTEXTUREBARRIERPROC", "glTextureBarrier")
 
 # Generate Files
 # ==================================
+if __name__ == "__main__":
+	GL_CORE_SORTED = sorted(GL_CORE.items())
+	env = Environment(
+		loader = FileSystemLoader('./'))
 
-if not os.path.exists("gl"):
-    os.makedirs("gl")
+	# try loading templates before
+	# creating/truncating any files
+	c_tpl = env.get_template("gl_loader.c.tpl")
+	h_tpl = env.get_template("gl_loader.h.tpl")
 
-"""
-// TODO: review extensions to be used for the low end OpenGL renderer
-// and also which ones to use with the high end OpenGL renderer
+	# generate ./gl directory
+	if not os.path.exists("gl"):
+		os.makedirs("gl")
 
-// [low] extensions
-// ARB_framebuffer_object / EXT_framebuffer_object
-// ARB_uniform_buffer_object
-// EXT_texture_array
-// ARB_sync
-// ARB_texture_storage
-// ARB_vertex_attrib_binding
-// ARB_explicit_attrib_location
-// ARB_explicit_uniform_location
-// ARB_shading_language_420pack
-// ARB_debug_output
+	# generate gl_loader.c
+	with open("gl/gl_loader.c", "w") as f:
+		f.write(c_tpl.render(GL_CORE = GL_CORE_SORTED))
 
-// [high] extensions
-// ARB_shader_draw_parameters
-// ARB_bindless_texture
-"""
-
-GL_CORE_SORTED = sorted(GL_CORE.items())
-GL_EXT_SORTED = sorted(GL_EXT.items())
-
-with open("gl/gl_loader.h", "wb") as f:
-    f.write(br'''// this file has been automatically generated by gllgen.py
-
-#ifndef __GL_LOADER_H__
-#define __GL_LOADER_H__
-
-#include "glcorearb.h"
-#include "glext.h"
-
-#ifdef _WIN32
-	#include "wglext.h"
-#else
-	#include "glxext.h"
-#endif
-
-// API Loading
-// ==================================
-GLboolean	GL_LoadAPI();
-void		GL_UnloadAPI();
-
-// Function Exports
-// ==================================
-
-// These are available in every platform as direct exports from the library
-// but on Windows, wglGetProcAddress will return NULL for any of these.
-
-// OpenGL 1.0
-GLAPI void APIENTRY glCullFace (GLenum mode);
-GLAPI void APIENTRY glFrontFace (GLenum mode);
-GLAPI void APIENTRY glHint (GLenum target, GLenum mode);
-GLAPI void APIENTRY glLineWidth (GLfloat width);
-GLAPI void APIENTRY glPointSize (GLfloat size);
-GLAPI void APIENTRY glPolygonMode (GLenum face, GLenum mode);
-GLAPI void APIENTRY glScissor (GLint x, GLint y, GLsizei width, GLsizei height);
-GLAPI void APIENTRY glTexParameterf (GLenum target, GLenum pname, GLfloat param);
-GLAPI void APIENTRY glTexParameterfv (GLenum target, GLenum pname, const GLfloat *params);
-GLAPI void APIENTRY glTexParameteri (GLenum target, GLenum pname, GLint param);
-GLAPI void APIENTRY glTexParameteriv (GLenum target, GLenum pname, const GLint *params);
-GLAPI void APIENTRY glTexImage1D (GLenum target, GLint level, GLint internalformat, GLsizei width, GLint border, GLenum format, GLenum type, const void *pixels);
-GLAPI void APIENTRY glTexImage2D (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void *pixels);
-GLAPI void APIENTRY glDrawBuffer (GLenum buf);
-GLAPI void APIENTRY glClear (GLbitfield mask);
-GLAPI void APIENTRY glClearColor (GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha);
-GLAPI void APIENTRY glClearStencil (GLint s);
-GLAPI void APIENTRY glClearDepth (GLdouble depth);
-GLAPI void APIENTRY glStencilMask (GLuint mask);
-GLAPI void APIENTRY glColorMask (GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha);
-GLAPI void APIENTRY glDepthMask (GLboolean flag);
-GLAPI void APIENTRY glDisable (GLenum cap);
-GLAPI void APIENTRY glEnable (GLenum cap);
-GLAPI void APIENTRY glFinish (void);
-GLAPI void APIENTRY glFlush (void);
-GLAPI void APIENTRY glBlendFunc (GLenum sfactor, GLenum dfactor);
-GLAPI void APIENTRY glLogicOp (GLenum opcode);
-GLAPI void APIENTRY glStencilFunc (GLenum func, GLint ref, GLuint mask);
-GLAPI void APIENTRY glStencilOp (GLenum fail, GLenum zfail, GLenum zpass);
-GLAPI void APIENTRY glDepthFunc (GLenum func);
-GLAPI void APIENTRY glPixelStoref (GLenum pname, GLfloat param);
-GLAPI void APIENTRY glPixelStorei (GLenum pname, GLint param);
-GLAPI void APIENTRY glReadBuffer (GLenum src);
-GLAPI void APIENTRY glReadPixels (GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void *pixels);
-GLAPI void APIENTRY glGetBooleanv (GLenum pname, GLboolean *data);
-GLAPI void APIENTRY glGetDoublev (GLenum pname, GLdouble *data);
-GLAPI GLenum APIENTRY glGetError (void);
-GLAPI void APIENTRY glGetFloatv (GLenum pname, GLfloat *data);
-GLAPI void APIENTRY glGetIntegerv (GLenum pname, GLint *data);
-GLAPI const GLubyte *APIENTRY glGetString (GLenum name);
-GLAPI void APIENTRY glGetTexImage (GLenum target, GLint level, GLenum format, GLenum type, void *pixels);
-GLAPI void APIENTRY glGetTexParameterfv (GLenum target, GLenum pname, GLfloat *params);
-GLAPI void APIENTRY glGetTexParameteriv (GLenum target, GLenum pname, GLint *params);
-GLAPI void APIENTRY glGetTexLevelParameterfv (GLenum target, GLint level, GLenum pname, GLfloat *params);
-GLAPI void APIENTRY glGetTexLevelParameteriv (GLenum target, GLint level, GLenum pname, GLint *params);
-GLAPI GLboolean APIENTRY glIsEnabled (GLenum cap);
-GLAPI void APIENTRY glDepthRange (GLdouble near, GLdouble far);
-GLAPI void APIENTRY glViewport (GLint x, GLint y, GLsizei width, GLsizei height);
-
-// OpenGL 1.1
-GLAPI void APIENTRY glDrawArrays (GLenum mode, GLint first, GLsizei count);
-GLAPI void APIENTRY glDrawElements (GLenum mode, GLsizei count, GLenum type, const void *indices);
-GLAPI void APIENTRY glGetPointerv (GLenum pname, void **params);
-GLAPI void APIENTRY glPolygonOffset (GLfloat factor, GLfloat units);
-GLAPI void APIENTRY glCopyTexImage1D (GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLint border);
-GLAPI void APIENTRY glCopyTexImage2D (GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border);
-GLAPI void APIENTRY glCopyTexSubImage1D (GLenum target, GLint level, GLint xoffset, GLint x, GLint y, GLsizei width);
-GLAPI void APIENTRY glCopyTexSubImage2D (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height);
-GLAPI void APIENTRY glTexSubImage1D (GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLenum type, const void *pixels);
-GLAPI void APIENTRY glTexSubImage2D (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels);
-GLAPI void APIENTRY glBindTexture (GLenum target, GLuint texture);
-GLAPI void APIENTRY glDeleteTextures (GLsizei n, const GLuint *textures);
-GLAPI void APIENTRY glGenTextures (GLsizei n, GLuint *textures);
-GLAPI GLboolean APIENTRY glIsTexture (GLuint texture);
-
-// Function Pointers
-// ==================================
-
-''')
-
-    for version, proc_list in GL_CORE_SORTED:
-        f.write(("\n// OpenGL %.1f\n" % GL_VERSION.get(version, 0)).encode("utf-8"))
-        for proc_type, proc_name in proc_list:
-            f.write(("GLAPI %s %s;\n" % (proc_type, proc_name)).encode("utf-8"))
-
-    f.write(b"\n#endif //__GL_LOADER_H__\n")
-
-
-# generate gl_loader.c
-with open("gl/gl_loader.c", "wb") as f:
-	f.write(br'''// this file has been automatically generated by gllgen.py
-
-#include "gl_loader.h"
-#include <stdio.h>
-
-// to activate logging, LOG, LOG_WARNING, LOG_ERROR, and LOG_DEBUG
-// macros should be defined using any logging interface
-
-#ifndef LOG
-	#define LOG(fmt, ...)
-#endif
-
-#ifndef LOG_WARNING
-	#define LOG_WARNING(fmt, ...)
-#endif
-
-#ifndef LOG_ERROR
-    #define LOG_ERROR(fmt, ...)
-#endif
-
-#ifndef LOG_DEBUG
-	#define LOG_DEBUG(fmt, ...)
-#endif
-
-#define GL_MAX_EXTENSION_COUNT 1024
-#define GL_MAX_EXTENSION_STRING_LEN (GL_MAX_EXTENSION_COUNT * 32)
-
-static GLboolean		l_loaded = GL_FALSE;
-static GLuint			l_extensionCount;
-static char				l_extensionString[GL_MAX_EXTENSION_STRING_LEN];
-static const char		*l_pExtensions[GL_MAX_EXTENSION_COUNT];
-''')
-
-	for version, proc_list in GL_CORE_SORTED:
-		f.write(("\n// OpenGL %.1f\n" % GL_VERSION.get(version, 0)).encode("utf-8"))
-		for proc_type, proc_name in proc_list:
-			f.write(("%s %s = NULL;\n" % (proc_type, proc_name)).encode("utf-8"))
-
-	f.write(br'''
-typedef (*PFNGLVOIDFUNCTION)(void);
-
-#if defined(_WIN32)
-static GLboolean GL_OpenLib()
-{
-	return GL_TRUE;
-}
-
-static void GL_CloseLib()
-{
-}
-
-static PFNGLVOIDFUNCTION GL_GetProcAddr(const char *procName)
-{
-	return (PFNGLVOIDFUNCTION) wglGetProcAddress((LPCSTR)procName);
-}
-#endif
-
-GLboolean GL_LoadAPI()
-{
-	const char *version, *ext;
-	char *ptr, *start;
-	GLuint major, minor, res, i;
-	PFNGLGETSTRINGIPROC glGetStringiLocal;
-
-	if(l_loaded == GL_TRUE){
-		LOG_WARNING("GL_LoadAPI: API is already loaded!");
-		return GL_TRUE;
-	}
-
-	version = glGetString(GL_VERSION);
-	if(version == NULL){
-		LOG_ERROR("GL_LoadAPI: failed to fetch GL version string! Maybe the context was not properly created.");
-		return GL_FALSE;
-	}
-
-	if(sscanf(version, "%d.%d", &major, &minor) != 2){
-		LOG_ERROR("GL_LoadAPI: invalid OpenGL version string! Maybe the context was not properly created.");
-		return GL_FALSE;
-	}
-
-	// retrieving the implementation extensions
-	// differs from OpenGL vesions prior to 3.0
-	if(major < 3){
-		// Here we get the OpenGL implementation static string with
-		// glGetString and copy it to a local buffer(l_extensionString).
-		// After that we replace every space character (0x20) for a null
-		// character (0x00) and reference the start of each extension in
-		// a pointer array (l_pExtensions).
-
-		l_extensionCount = 0;
-		ext = glGetString(GL_EXTENSIONS);
-		memcpy(l_extensionString, ext, strlen(ext) + 1);
-		start = l_extensionString;
-		ptr = start;
-		while(*ptr != 0){
-			if(*ptr == 0x20){
-				*ptr = 0x00;
-				l_pExtensions[l_extensionCount] = start;
-				l_extensionCount++;
-				start = ptr + 1;
-			}
-			ptr++;
-		}
-	}
-	else{
-		glGetStringiLocal = (PFNGLGETSTRINGIPROC)GL_GetProcAddr("glGetStringi");
-		if(glGetStringiLocal == NULL){
-			LOG_ERROR("GL_LoadAPI: failed to retrieve 'glGetStringi' proc! Unable to load API.");
-			return GL_FALSE;
-		}
-
-		glGetIntegerv(GL_NUM_EXTENSIONS, &l_extensionCount);
-		for(i = 0; i < l_extensionCount; i++)
-			l_pExtensions[i] = glGetStringiLocal(GL_EXTENSIONS, i);
-	}
-
-	// Load GL Core
-	//=================================================================
-	#define GL_GET_PROC_ADDR(proc_type, proc_name)									\
-		proc_name = (proc_type) GL_GetProcAddr(#proc_name);							\
-		if(proc_name == NULL){														\
-			LOG_ERROR("GL_LoadAPI: failed to load core proc '%s'!", #proc_name);	\
-			res = GL_FALSE;															\
-		}
-
-	res = GL_TRUE;
-''')
-
-	for version, proc_list in GL_CORE_SORTED:
-		f.write((r'''
-	// OpenGL %.1f
-	if(major < %d || major == %d && minor <= %d){
-		res = GL_TRUE;
-
-''' % (GL_VERSION.get(version, 0),
-		GL_VERSION_MAJOR.get(version, 0),
-		GL_VERSION_MAJOR.get(version, 0),
-		GL_VERSION_MINOR.get(version, 0))).encode("utf-8"))
-
-		for proc_type, proc_name in proc_list:
-			f.write(("\t\tGL_GET_PROC_ADDR(%s, %s);\n" % (proc_type, proc_name)).encode("utf-8"))
-
-		f.write((r'''
-		if(res == GL_FALSE){
-			LOG_ERROR("GL_LoadAPI: failed to load OpenGL Core %.1f!");
-			return GL_FALSE;
-		}
-	}
-''' % GL_VERSION.get(version, 0)).encode("utf-8"))
-
-	f.write(br'''
-	#undef GL_GET_PROC_ADDR
-	//=================================================================
-
-	// Load GL Extensions
-	//=================================================================
-''')
-
-	# GL_EXTENSIONS
-
-	f.write(br'''
-	//=================================================================
-
-	return GL_TRUE;
-}
-
-void GL_UnloadAPI()
-{
-	GL_CloseLib();
-	l_loaded = GL_FALSE;
-}
-
-
-''')
+	# generate gl_loader.h
+	with open("gl/gl_loader.h", "w") as f:
+		f.write(h_tpl.render(GL_CORE = GL_CORE_SORTED))
