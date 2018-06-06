@@ -767,17 +767,17 @@ if __name__ == "__main__":
 
 	# try loading templates before
 	# creating/truncating any files
-	c_tpl = env.get_template("gl_loader.c.tpl")
-	h_tpl = env.get_template("gl_loader.h.tpl")
+	c_tpl = env.get_template("gll.c.tpl")
+	h_tpl = env.get_template("gll.h.tpl")
 
 	# generate ./gl directory
 	if not os.path.exists("gl"):
 		os.makedirs("gl")
 
-	# generate gl_loader.c
-	with open("gl/gl_loader.c", "w") as f:
+	# generate gll.c
+	with open("gl/gll.c", "w") as f:
 		f.write(c_tpl.render(GL_CORE = GL_CORE_SORTED))
 
-	# generate gl_loader.h
-	with open("gl/gl_loader.h", "w") as f:
+	# generate gll.h
+	with open("gl/gll.h", "w") as f:
 		f.write(h_tpl.render(GL_CORE = GL_CORE_SORTED))
