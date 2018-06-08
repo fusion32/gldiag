@@ -1,7 +1,6 @@
 // stdlib includes
 #include <algorithm>
 #include <iostream>
-#include <fstream>
 #include <string>
 
 // sdl includes
@@ -12,32 +11,6 @@
 
 // local includes
 #include "scopeguard.h"
-
-// a few string overloads to help outputting
-std::string &operator<<(std::string &self, const std::string &rhs){
-	self += rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const GLubyte *rhs){
-	self += (const char*)rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const GLubyte rhs){
-	self += (const char)rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const char *rhs){
-	self += rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const char rhs){
-	self += rhs;
-	return self;
-}
 
 // a few helpers
 bool isdigit(char ch){
@@ -52,19 +25,18 @@ bool next_number(const char *str, int &num){
 	return true;
 }
 
-// output diag to buf
-void gldiag(std::string &buf){
+void gldiag(void){
 	SDL_Window *window;
 	SDL_GLContext ctx;
 	int version;
 	PFNGLGETSTRINGPROC glGetString;
 
 	if(SDL_Init(SDL_INIT_VIDEO) != 0){
-		std::cout << "Failed to initialize SDL video system\n";
-		std::cout << "ERROR: " << SDL_GetError() << '\n';
+		std::clog << "Failed to initialize SDL video system\n";
+		std::clog << "ERROR: " << SDL_GetError() << '\n';
 		return;
 	}
-	auto sdl_guard = make_scope_guard(SDL_Quit);
+	SCOPE_EXIT(SDL_Quit);
 
 	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
 	//SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 5);
@@ -75,35 +47,33 @@ void gldiag(std::string &buf){
 		SDL_WINDOWPOS_UNDEFINED, 100, 100,
 		SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
 	if(window == nullptr){
-		std::cout << "Failed to create SDL window\n";
-		std::cout << "ERROR: " << SDL_GetError() << '\n';
+		std::clog << "Failed to create SDL window\n";
+		std::clog << "ERROR: " << SDL_GetError() << '\n';
 		return;
 	}
-	auto window_guard = make_scope_guard(
-		[&](void){ SDL_DestroyWindow(window); });
+	SCOPE_EXIT([&](void){ SDL_DestroyWindow(window); });
 
 	ctx = SDL_GL_CreateContext(window);
 	if(ctx == nullptr){
-		std::cout << "Failed to create GL context\n";
-		std::cout << "ERROR: " << SDL_GetError() << '\n';
+		std::clog << "Failed to create GL context\n";
+		std::clog << "ERROR: " << SDL_GetError() << '\n';
 		return;
 	}
-	auto ctx_guard = make_scope_guard(
-		[&](void){ SDL_GL_DeleteContext(ctx); });
+	SCOPE_EXIT([&](void){ SDL_GL_DeleteContext(ctx); });
 
 	// retrieve opengl info
 	glGetString = (PFNGLGETSTRINGPROC)SDL_GL_GetProcAddress("glGetString");
 	if(glGetString == nullptr){
-		std::cout << "failed to load `glGetString` proc address";
+		std::clog << "failed to load `glGetString` proc address";
 		return;
 	}
 	if(!next_number((const char*)glGetString(GL_VERSION), version)){
-		std::cout << "failed to parse OpenGL version string\n";
+		std::clog << "failed to parse OpenGL version string\n";
 		return;
 	}
 
 	// overall info
-	buf << "OpenGL Info"
+	std::cout << "OpenGL Info"
 		<< "\n============================="
 		<< "\nVendor: " << glGetString(GL_VENDOR)
 		<< "\nRenderer: " << glGetString(GL_RENDERER)
@@ -115,7 +85,7 @@ void gldiag(std::string &buf){
 	// TODO: add limits
 
 	// supported extensions
-	buf << "Supported Extensions"
+	std::cout << "Supported Extensions"
 		<< "\n=============================";
 	if(version >= 3){
 		int extension_count;
@@ -123,47 +93,29 @@ void gldiag(std::string &buf){
 		auto glGetStringi = (PFNGLGETSTRINGIPROC)SDL_GL_GetProcAddress("glGetStringi");
 		auto glGetIntegerv = (PFNGLGETINTEGERVPROC)SDL_GL_GetProcAddress("glGetIntegerv");
 		if(glGetStringi == nullptr || glGetIntegerv == nullptr){
-			std::cout << "failed to load `glGetStringi` proc address\n";
-			std::cout << "failed to load `glGetIntegerv` proc address\n";
-			buf << "\nFailed to parse extensions";
+			std::clog << "failed to load `glGetStringi` proc address\n";
+			std::clog << "failed to load `glGetIntegerv` proc address\n";
+			std::cout << "\nFailed to parse extensions";
 		}
 		// parse extensions
 		glGetIntegerv(GL_NUM_EXTENSIONS, &extension_count);
 		for(int i = 0; i < extension_count; i++){
-			buf << '\n' << glGetStringi(GL_EXTENSIONS, i);
+			std::cout << '\n' << glGetStringi(GL_EXTENSIONS, i);
 		}
 	}else{
 		std::string str = (const char*)glGetString(GL_EXTENSIONS);
 		if(str.length() > 0){
 			std::replace(str.begin(), str.end(), ' ', '\n');
-			buf << str;
+			std::cout << str;
 		}else{
-			buf << "\nFailed to parse extensions";
+			std::cout << "\nFailed to parse extensions";
 		}
 	}
-	buf << "\n\n";
+	std::cout << "\n\n";
 }
 
 int main(int argc, char **argv){
-	std::ofstream f;
-	std::string buffer;
-
-	// this will speedup cout
 	std::ios_base::sync_with_stdio(false);
-	// 32KB should be enough
-	buffer.reserve(32768);
-
-	// collect data
-	gldiag(buffer);
-
-	// write buffer to file
-	f.open("gldiag.txt", std::ios_base::out | std::ios_base::trunc);
-	if(f.fail()){
-		std::cout << "failed to open file for writing\n";
-		return -1;
-	}
-	f << buffer;
-	f.close();
-	std::cout << "File 'gldiag.txt' generated\n";
+	gldiag();
 	return 0;
 }

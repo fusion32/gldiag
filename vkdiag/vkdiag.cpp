@@ -1,8 +1,5 @@
 // stdlib includes
-#include <algorithm>
 #include <iostream>
-#include <fstream>
-#include <string>
 #include <vector>
 
 // sdl includes
@@ -16,42 +13,6 @@
 // local includes
 #include "scopeguard.h"
 
-// a few string overloads to help outputting
-std::string &operator<<(std::string &self, const std::string &rhs){
-	self += rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const char *rhs){
-	self += rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, const char rhs){
-	self += rhs;
-	return self;
-}
-
-std::string &operator<<(std::string &self, size_t rhs){
-	self += std::to_string(rhs);
-	return self;
-}
-
-std::string &operator<<(std::string &self, uint32_t rhs){
-	self += std::to_string(rhs);
-	return self;
-}
-
-std::string &operator<<(std::string &self, int rhs){
-	self += std::to_string(rhs);
-	return self;
-}
-
-std::string &operator<<(std::string &self, bool rhs){
-	self += rhs ? "true" : "false";
-	return self;
-}
-
 // helper macros
 #define DEF_VK_PROC(proc)	\
 	PFN_##proc proc
@@ -59,7 +20,7 @@ std::string &operator<<(std::string &self, bool rhs){
 	proc = (PFN_##proc)vkGetInstanceProcAddr(inst, #proc)
 
 // output diag to buf
-void vkdiag(std::string &buf){
+void vkdiag(void){
 	DEF_VK_PROC(vkGetInstanceProcAddr);
 	DEF_VK_PROC(vkCreateInstance);
 	DEF_VK_PROC(vkDestroyInstance);
@@ -70,31 +31,31 @@ void vkdiag(std::string &buf){
 	DEF_VK_PROC(vkGetPhysicalDeviceFeatures);
 
 	if(SDL_Init(SDL_INIT_VIDEO) != 0){
-		std::cout << "Failed to initialize SDL video system\n";
-		std::cout << "ERROR: " << SDL_GetError() << '\n';
+		std::clog << "Failed to initialize SDL video system\n";
+		std::clog << "ERROR: " << SDL_GetError() << '\n';
 		return;
 	}
-	auto sdl_guard = make_scope_guard(SDL_Quit);
+	SCOPE_EXIT(SDL_Quit);
 
 	if(SDL_Vulkan_LoadLibrary(NULL) != 0){
-		std::cout << "No Vulkan driver found\n";
-		std::cout << "ERROR: " << SDL_GetError() << '\n';
+		std::clog << "No Vulkan driver found\n";
+		std::clog << "ERROR: " << SDL_GetError() << '\n';
 		return;
 	}
-	auto vklib_guard = make_scope_guard(SDL_Vulkan_UnloadLibrary);
+	SCOPE_EXIT(SDL_Vulkan_UnloadLibrary);
 
 	// load vkGetInstanceProcAddr
 	vkGetInstanceProcAddr =
 		(PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr();
 	if(vkGetInstanceProcAddr == nullptr){
-		std::cout << "Failed to load `vkGetInstanceProcAddr` proc\n";
+		std::clog << "Failed to load `vkGetInstanceProcAddr` proc\n";
 		return;
 	}
 
 	// load vkCreateInstance
 	GET_VK_INSTANCE_PROC(nullptr, vkCreateInstance);
 	if(vkCreateInstance == nullptr){
-		std::cout << "Failed to load `vkCreateInstance` proc\n";
+		std::clog << "Failed to load `vkCreateInstance` proc\n";
 		return;
 	}
 
@@ -113,18 +74,17 @@ void vkdiag(std::string &buf){
 	};
 	res = vkCreateInstance(&instance_create_info, nullptr, &instance);
 	if(res != VK_SUCCESS){
-		std::cout << "Failed to create Vulkan instance\n";
+		std::clog << "Failed to create Vulkan instance\n";
 		return;
 	}
 
 	// load vkDestroyInstance
 	GET_VK_INSTANCE_PROC(instance, vkDestroyInstance);
 	if(vkDestroyInstance == nullptr){
-		std::cout << "FATAL: failed to load `vkDestroyInstance` proc address";
+		std::clog << "FATAL: failed to load `vkDestroyInstance` proc address";
 		std::terminate();
 	}
-	auto vkinstance_guard = make_scope_guard(
-		[&](void){ vkDestroyInstance(instance, nullptr); });
+	SCOPE_EXIT([&](void){ vkDestroyInstance(instance, nullptr); });
 
 	// load other vulkan functions
 	GET_VK_INSTANCE_PROC(instance, vkEnumeratePhysicalDevices);
@@ -137,7 +97,7 @@ void vkdiag(std::string &buf){
 			vkGetPhysicalDeviceMemoryProperties == nullptr ||
 			vkGetPhysicalDeviceQueueFamilyProperties == nullptr ||
 			vkGetPhysicalDeviceFeatures == nullptr){
-		std::cout << "Failed to load vulkan procs! Unable to proceed";
+		std::clog << "Failed to load vulkan procs! Unable to proceed";
 		return;
 	}
 
@@ -145,26 +105,26 @@ void vkdiag(std::string &buf){
 	uint32_t count;
 	res = vkEnumeratePhysicalDevices(instance, &count, NULL);
 	if(res != VK_SUCCESS){
-		std::cout << "Failed to enumerate physical devices\n";
+		std::clog << "Failed to enumerate physical devices\n";
 		return;
 	}
 
 	std::vector<VkPhysicalDevice> devices(count);
 	res = vkEnumeratePhysicalDevices(instance, &count, devices.data());
 	if(res != VK_SUCCESS){
-		std::cout << "Failed to retrieve physical devices\n";
+		std::clog << "Failed to retrieve physical devices\n";
 		return;
 	}
 
 	int j = 0;
 	for(auto device : devices){
-		buf << "Device #" << j++
+		std::cout << "Device #" << j++
 			<< "\n=============================\n";
 
 		// device properties
 		VkPhysicalDeviceProperties properties;
 		vkGetPhysicalDeviceProperties(device, &properties);
-		buf << "[Properties]"
+		std::cout << "[Properties]"
 			<< "\nAPI Version: "
 				<< VK_VERSION_MAJOR(properties.apiVersion) << '.'
 				<< VK_VERSION_MINOR(properties.apiVersion) << '.'
@@ -181,28 +141,28 @@ void vkdiag(std::string &buf){
 		vkGetPhysicalDeviceMemoryProperties(device, &mem_properties);
 
 		// memory heaps
-		buf << "[Memory Heaps]";
+		std::cout << "[Memory Heaps]";
 		for(uint32_t k = 0; k < mem_properties.memoryHeapCount; k++){
-			buf << "\nHeap #" << k
+			std::cout << "\nHeap #" << k
 				<< ": size = " << mem_properties.memoryHeaps[k].size
 				<< ", flags = " << mem_properties.memoryHeaps[k].flags;
 		}
-		buf << "\n\n";
+		std::cout << "\n\n";
 
 		// memory types
-		buf << "[Memory Types]";
+		std::cout << "[Memory Types]";
 		for(uint32_t k = 0; k < mem_properties.memoryTypeCount; k++){
-			buf << "\nType #" << k
+			std::cout << "\nType #" << k
 				<< ": propertyFlags = " << mem_properties.memoryTypes[k].propertyFlags
 				<< ", heapIndex = " << mem_properties.memoryTypes[k].heapIndex;
 		}
-		buf << "\n\n";
+		std::cout << "\n\n";
 
 		// device queue family properties
 		vkGetPhysicalDeviceQueueFamilyProperties(device, &count, NULL);
-		buf << "[Queue Family Properties]";
+		std::cout << "[Queue Family Properties]";
 		if(count == 0){
-			buf << "\nFailed to query device queue family count";
+			std::cout << "\nFailed to query device queue family count";
 		}else{
 			std::vector<VkQueueFamilyProperties> qf_properties(count);
 			vkGetPhysicalDeviceQueueFamilyProperties(device,
@@ -210,7 +170,7 @@ void vkdiag(std::string &buf){
 
 			int k = 0;
 			for(auto prop : qf_properties){
-				buf << "\nQueue Family #" << k++
+				std::cout << "\nQueue Family #" << k++
 					<< "\n* queueFlags: " << prop.queueFlags
 					<< "\n* queueCount: " << prop.queueCount
 					<< "\n* timestampValidBits: " << prop.timestampValidBits
@@ -220,12 +180,12 @@ void vkdiag(std::string &buf){
 						<< ", depth = " << prop.minImageTransferGranularity.depth;
 			}
 		}
-		buf << "\n\n";
+		std::cout << "\n\n";
 
 		// device features
 		VkPhysicalDeviceFeatures features;
 		vkGetPhysicalDeviceFeatures(device, &features);
-		buf << "[Features]"
+		std::cout << "[Features]"
 			<< "\n* robustBufferAccess: " << features.robustBufferAccess
 			<< "\n* fullDrawIndexUint32: " << features.fullDrawIndexUint32
 			<< "\n* imageCubeArray: " << features.imageCubeArray
@@ -286,26 +246,7 @@ void vkdiag(std::string &buf){
 }
 
 int main(int argc, char **argv){
-	std::ofstream f;
-	std::string buffer;
-
-	// this will speedup cout
 	std::ios_base::sync_with_stdio(false);
-	// 32KB should be enough
-	buffer.reserve(32768);
-
-	// collect data
-	vkdiag(buffer);
-
-	// write buffer to file
-	f.open("vkdiag.txt", std::ios_base::out | std::ios_base::trunc);
-	if(f.fail()){
-		std::cout << "failed to open file for writing\n";
-		return -1;
-	}
-	f << buffer;
-	f.close();
-	std::cout << "File 'vkdiag.txt' generated\n";
-	std::cin.get();
+	vkdiag();
 	return 0;
 }
